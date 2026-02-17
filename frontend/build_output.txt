@@ -1,0 +1,4 @@
+﻿
+> tunis-traffic@0.1.0 build C:\AD-Eyes-versions\ADEyes projects\tunis-traffic\frontend
+> next build
+

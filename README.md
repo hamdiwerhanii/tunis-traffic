@@ -1,345 +1,243 @@
 # Tunis Traffic
 
-**A full-stack web app for checking live traffic in Tunis and planning when to leave.**
-
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_9-47A248?logo=mongodb&logoColor=white)
 ![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)
-![TomTom](https://img.shields.io/badge/TomTom-Traffic_%26_Routing-DF1B12)
-![pnpm](https://img.shields.io/badge/pnpm-F69220?logo=pnpm&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)
 
----
+Check traffic in Tunis before you drive. Tunis Traffic shows a live traffic map, tells you whether it is rush hour, finds streets and places, remembers your favorite places and recent searches, and answers the question every commuter asks: **"When should I leave?"**
 
 ## Table of Contents
 
-- [Overview](#overview)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Scripts](#scripts)
 - [API Reference](#api-reference)
+- [Security](#security)
 - [Testing and Quality](#testing-and-quality)
 - [Design Decisions and Limitations](#design-decisions-and-limitations)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
 - [License](#license)
-- [Author](#author)
-
----
-
-## Overview
-
-Commuters in Tunis have no quick, central place to check traffic and decide when to leave. General navigation apps can do this, but they take several taps to give a simple overview of the city. **Tunis Traffic** opens straight onto a full-screen map of Tunis with live, colour-coded traffic on every road. Floating panels let you search for places, jump to your GPS position, save favourites and calculate a traffic-aware route to a popular destination.
-
-The project is split into two apps:
-
-- **Frontend** (`frontend/`): a single-page Next.js dashboard built on Leaflet and OpenStreetMap. It calls TomTom for traffic tiles and routing and Nominatim for place search, directly from the browser.
-- **Backend** (`backend/`): a NestJS REST API with MongoDB that stores **favourite places** and **search history**. Data is grouped by an anonymous session ID, so no login is needed.
-
-It was built as a 48-hour full-stack bootcamp project.
-
----
 
 ## Features
 
 ### Map and live traffic
-- Full-screen Leaflet map centred on Avenue Habib Bourguiba (zoom 13), with OpenStreetMap base tiles.
-- **TomTom Traffic Flow** tiles colour roads by how congested they are.
-- **TomTom Traffic Incidents** tiles show accidents, roadworks and other events.
-- **My Location** button that uses the browser Geolocation API to centre the map on you.
+- Full-screen map of Greater Tunis (OpenStreetMap), limited to Tunisia.
+- Live congestion and incidents from TomTom when the server has an API key. The key never reaches the browser: tiles are proxied by the API.
+
+### Rush hour status
+- Light, moderate or heavy traffic estimated from the usual weekday rush hours (07:30–09:00 and 16:30–18:30), always computed in **Tunis time**.
+- Tells you when the next rush hour starts, and knows that weekends are quiet.
 
 ### Search and places
-- Place search powered by **Nominatim** (OpenStreetMap geocoding), limited to Tunisia (`countrycodes=tn`), with up to 5 suggestions.
-- **Quick places**: one-click shortcuts to 8 popular destinations, including Tunis-Carthage Airport, Bardo Museum, La Marsa, Lac de Tunis, the Medina, La Goulette, Ariana and Manouba.
-- **Place action bar** for the selected place. You can save it as a favourite, and each selection is added to your search history automatically.
+- Search streets and places in Tunisia with a keyboard-friendly autocomplete (arrows, Enter, Escape).
+- One-tap shortcuts to popular places: the airport, the Medina, the Bardo Museum, La Marsa and more.
 
-### Traffic-aware routing ("When should I leave?")
-- Calculates a car route from your current location to one of the popular destinations, using the **TomTom Routing API** with `traffic=true`.
-- Asks for up to 5 alternative routes and **picks the one with the lowest traffic delay**.
-- Draws the route on the map in a colour based on the delay: green (< 2 min), yellow (2–4 min), orange (5–9 min) or red (10 min or more). The map then zooms to fit the route.
-- Shows the distance, the travel time and the traffic delay.
-- Optional **arrival time**: if you set one, the app works out the recommended departure time.
+### "When should I leave?"
+- From your location to any searched, saved or popular place.
+- Optionally pick an arrival time: the app works out the departure time.
+- Uses TomTom traffic-aware routing when configured, otherwise OSRM (distance and driving time without traffic). The route is drawn on the map.
 
-### Traffic status panel
-- Estimates the current traffic level (Low / Moderate / Heavy) from **Tunis peak hours**:
-  - Morning rush: 07:30–09:00
-  - Evening rush: 16:30–18:30
-  - "Moderate" in the 30 minutes before and after each peak, and "Low" on weekends and at night.
-- Shows the current or next peak period and refreshes every minute.
-- Note: this panel is a time-based estimate and does not use live data (see [Limitations](#design-decisions-and-limitations)).
+### Saved places and recent searches
+- Save places and find your last searches on any visit, **without an account**: each browser gets an anonymous, private session.
+- Repeated searches move to the top instead of duplicating; history keeps the last 20 places.
 
-### Favourites and search history (persisted)
-- Save, list and remove favourite places. They are stored in MongoDB, and the backend rejects duplicates.
-- Recent searches are listed newest first and can be cleared in one action. The backend keeps the **20 most recent entries** per session and deletes older ones automatically.
-- Each browser gets an **anonymous session ID**, a UUID stored in `localStorage`. Accounts are not required.
-
-### Backend API
-- REST endpoints with request validation (`class-validator` and a global `ValidationPipe` with `whitelist`).
-- Interactive **Swagger / OpenAPI** documentation at `/api`.
-- A `/health` endpoint.
-- CORS limited to the configured frontend URL.
-
----
+### Works everywhere
+- Desktop sidebar layout, and a phone layout with a collapsible bottom sheet so the map stays visible.
+- Keyboard and screen reader friendly (labelled controls, tabs, combobox, live regions), reduced-motion support.
 
 ## Tech Stack
 
-| Layer | Technologies |
-|---|---|
-| **Frontend framework** | Next.js 16 (App Router), React 19, TypeScript 5 |
-| **Styling / UI** | Tailwind CSS v4, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react` icons |
-| **State and data fetching** | Zustand (map state), TanStack React Query v5 (server state and caching) |
-| **Map** | Leaflet 1.9 + OpenStreetMap tiles |
-| **External APIs** | TomTom Traffic Flow and Incidents tiles, TomTom Routing API, Nominatim geocoding |
-| **Backend** | NestJS 11, `@nestjs/config`, `@nestjs/swagger`, `class-validator` / `class-transformer` |
-| **Database** | MongoDB via Mongoose 9 (`@nestjs/mongoose`) |
-| **Tooling** | pnpm, ESLint 9, Prettier, Jest 30 + Supertest |
-
----
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript 6, Tailwind CSS 4, TanStack Query 5, Zustand 5, Leaflet 1.9, lucide-react |
+| Backend | NestJS 12 (native ES modules), Mongoose 9, class-validator, Swagger/OpenAPI, Helmet, @nestjs/throttler |
+| Database | MongoDB |
+| External services | OpenStreetMap tiles, Nominatim (search), OSRM (routing), TomTom Traffic and Routing (optional) |
+| Tooling | pnpm workspace, ESLint 10, Prettier, Vitest 4, Testing Library, axe-core, Supertest, mongodb-memory-server, GitHub Actions, Dependabot |
 
 ## Architecture
 
 ```
-┌──────────────────────────────────┐        ┌──────────────────────────────┐
-│            FRONTEND              │  REST  │           BACKEND            │
-│     Next.js · localhost:3000     │ ─────► │    NestJS · localhost:5000   │
-│                                  │        │                              │
-│  • Leaflet map (OSM tiles)       │        │  • /favorite                 │
-│  • Zustand map store             │        │  • /search-history           │
-│  • React Query (API cache)       │        │  • /health                   │
-│  • Anonymous sessionId           │        │  • Swagger UI at /api        │
-└───────────────┬──────────────────┘        └──────────────┬───────────────┘
-                │ direct browser calls                     │ Mongoose
-                ▼                                          ▼
-   TomTom (traffic tiles, routing)                      MongoDB
-   Nominatim (place search)
+Browser ──► Next.js (frontend, port 3000)
+              │  /api/*  is proxied (same origin, first-party cookie)
+              ▼
+            NestJS API (backend, port 5000)
+              ├── favorites, search-history ──► MongoDB
+              ├── places   ──► Nominatim (cached, max 1 request/second)
+              ├── routes   ──► TomTom Routing  or  OSRM
+              └── traffic  ──► TomTom traffic tiles (cached, Tunisia only)
 ```
 
-The backend only stores user data. Traffic, routing and geocoding requests go straight from the browser to TomTom and Nominatim.
-
----
+- **One origin for the browser.** Next.js rewrites `/api/*` to the API, so there is no CORS and the session cookie is a normal first-party cookie.
+- **Anonymous sessions.** On the first request the API sets an `httpOnly`, `SameSite=Lax` cookie containing a random UUID. Every favorite and history entry is tied to it, and the browser never sends or chooses a session id itself.
+- **External services stay on the server.** API keys, rate limits, caching and the Nominatim usage policy are handled in one place.
 
 ## Project Structure
 
 ```
 tunis-traffic/
-├── frontend/                          # Next.js app (port 3000)
-│   ├── public/                        # Static assets
-│   └── src/
-│       ├── app/
-│       │   ├── layout.tsx             # Root layout, fonts, providers
-│       │   ├── page.tsx               # Home page -> TrafficDashboard
-│       │   └── globals.css            # Global styles + Leaflet overrides
-│       ├── api/
-│       │   ├── api.client.ts          # Fetch wrapper (uses NEXT_PUBLIC_BACKEND_URL)
-│       │   ├── favorite.api.ts        # Favorites endpoints
-│       │   └── search-history.api.ts  # Search history endpoints
-│       ├── lib/
-│       │   ├── providers.tsx          # React Query provider
-│       │   ├── queryClient.ts
-│       │   ├── session.ts             # Anonymous sessionId in localStorage
-│       │   └── utils.ts               # cn() helper
-│       ├── modules/traffic/components/
-│       │   ├── TrafficDashboard.tsx   # Main screen layout
-│       │   ├── TrafficMap.tsx         # Leaflet map container
-│       │   ├── SearchBar.tsx          # Nominatim search
-│       │   ├── QuickPlaces.tsx        # Popular destinations
-│       │   ├── FavoritesPanel.tsx
-│       │   ├── SearchHistoryPanel.tsx
-│       │   ├── PlaceActionBar.tsx     # Save favourite / auto-record history
-│       │   ├── TrafficStatusPanel.tsx # Peak-hour traffic estimate
-│       │   └── DepartureHelper.tsx    # "When should I leave?" routing
-│       ├── shared/
-│       │   ├── components/            # Button, Input
-│       │   ├── constants/trafficConstants.ts  # Tunis centre, peak times, places
-│       │   ├── hooks/                 # useLeafletMap, useTrafficLevel, useSessionId
-│       │   └── store/mapStore.ts      # Zustand store
-│       └── types/                     # Shared TypeScript types
-│
-├── backend/                           # NestJS API (port 5000)
+├── backend/                         NestJS API
 │   ├── src/
-│   │   ├── main.ts                    # Bootstrap, Swagger, CORS, ValidationPipe
-│   │   ├── app.module.ts              # Config + MongoDB connection
-│   │   ├── app.controller.ts          # GET /health
-│   │   ├── favorite/                  # Controller, service, DTO, schema
-│   │   └── search-history/            # Controller, service, DTO, schema
-│   └── test/                          # e2e test config
-│
-├── APP_GUIDE.md                       # In-depth walkthrough of the codebase
-├── PLAN.md                            # Planning / design document
-└── README.md
+│   │   ├── common/                  session cookie, validation helpers, upstream fetch, cache, geo
+│   │   ├── config/                  validated environment variables
+│   │   ├── favorites/               saved places (schema, DTOs, service, controller)
+│   │   ├── search-history/          recent searches
+│   │   ├── places/                  place search (Nominatim)
+│   │   ├── routes/                  route planning (TomTom or OSRM)
+│   │   ├── traffic/                 live traffic status and tiles
+│   │   ├── health/                  health check
+│   │   ├── app.module.ts  app.setup.ts  bootstrap.ts  main.ts  demo.ts
+│   ├── scripts/verify-build.mjs     checks the compiled build loads as native ES modules
+│   └── test/                        API tests (Vitest + Supertest + in-memory MongoDB)
+├── frontend/                        Next.js app
+│   ├── src/
+│   │   ├── app/                     layout, page, global styles, icon
+│   │   ├── lib/                     API client, query client, helpers
+│   │   ├── modules/Traffic/         api, components, constants, hooks, store, types, utils
+│   │   └── shared/                  shared components and providers
+│   └── __tests__/unit/              unit, component and accessibility tests
+├── .github/                         CI workflow and Dependabot
+├── package.json                     workspace scripts
+└── pnpm-workspace.yaml
 ```
-
----
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Node.js** 18 or later
-- **pnpm** (`npm install -g pnpm`)
-- **MongoDB**, either a local instance or a MongoDB Atlas connection string
-- A free **TomTom developer API key** (see below)
+- Node.js **20.19 or newer**
+- pnpm 10 (`npm install -g pnpm`)
+- MongoDB 6+ for normal use (not needed for the demo mode)
 
-### 1. Clone the repository
+### 1. Install
 
 ```bash
 git clone https://github.com/hamdiwerhanii/tunis-traffic.git
 cd tunis-traffic
-```
-
-### 2. Backend setup
-
-```bash
-cd backend
 pnpm install
 ```
 
-Create a `backend/.env` file. The repository does not include an example file. The backend also loads `.env.development` or `.env.production` when `NODE_ENV` matches.
+### 2. Try it instantly (demo mode)
 
-| Variable | Description | Example |
-|---|---|---|
-| `MONGODB_URI` | MongoDB connection string (required) | `mongodb://localhost:27017/tunis_traffic_db` |
-| `NEST_PUBLIC_FRONTEND_URL` | Origin allowed by CORS | `http://localhost:3000` |
-| `PORT` | API port (defaults to `5000`) | `5000` |
+Runs the API with a temporary in-memory MongoDB, so nothing needs to be installed or configured:
 
 ```bash
-pnpm run start:dev
-# API:     http://localhost:5000
-# Swagger: http://localhost:5000/api
+pnpm dev:demo
 ```
 
-### 3. Frontend setup
+Open http://localhost:3000. API docs: http://localhost:5000/api/docs. Data is lost when you stop the server.
+
+### 3. Run with your own MongoDB
 
 ```bash
-cd frontend
-pnpm install
+cp backend/.env.example backend/.env       # set MONGODB_URI, optionally TOMTOM_API_KEY
+cp frontend/.env.example frontend/.env.local
+pnpm dev
 ```
 
-Create a `frontend/.env.local` file:
+### 4. Enable live traffic (optional, free)
 
-| Variable | Description | Example |
-|---|---|---|
-| `NEXT_PUBLIC_BACKEND_URL` | Base URL of the NestJS API (defaults to `http://localhost:5000`) | `http://localhost:5000` |
-| `NEXT_PUBLIC_TOMTOM_API_KEY` | TomTom key for the traffic tiles and routing | `your_tomtom_api_key` |
+1. Create an account at [developer.tomtom.com](https://developer.tomtom.com) and copy your API key.
+2. Put it in `backend/.env` as `TOMTOM_API_KEY=...` and restart the API.
 
-```bash
-pnpm run dev
-# App: http://localhost:3000
-```
+The map then shows live congestion and incidents, and trip times include traffic delays.
 
-> Without `NEXT_PUBLIC_TOMTOM_API_KEY` the map still loads, but it has no traffic overlay and route calculation will fail.
+## Environment Variables
 
-### 4. Get a TomTom API key (free)
+### backend/.env
 
-1. Sign up at [developer.tomtom.com](https://developer.tomtom.com).
-2. Create an app in the dashboard and copy its API key.
-3. Paste the key into `frontend/.env.local` as `NEXT_PUBLIC_TOMTOM_API_KEY`.
+| Variable | Description | Default |
+| --- | --- | --- |
+| `PORT` | API port | `5000` |
+| `MONGODB_URI` | MongoDB connection string (**required** outside demo mode) | none |
+| `TOMTOM_API_KEY` | Enables live traffic tiles and traffic-aware routing | empty (off) |
+| `NOMINATIM_URL` | Place search server | `https://nominatim.openstreetmap.org` |
+| `OSRM_URL` | Routing server used without TomTom | `https://router.project-osrm.org` |
+| `CONTACT_EMAIL` | Contact sent to Nominatim in the User-Agent, as its policy asks | empty |
+| `SWAGGER_ENABLED` | Serve the API docs at `/api/docs` | `true` |
+| `TRUST_PROXY` | Express `trust proxy` setting, so rate limits see the real client IP behind Next.js | `loopback` |
 
-TomTom's free tier is enough for development and demos.
+The API refuses to start if a variable is invalid, with a clear message.
 
-### Available scripts
+### frontend/.env.local
 
-| Location | Command | Description |
-|---|---|---|
-| `backend/` | `pnpm run start:dev` | Start the API in watch mode |
-| `backend/` | `pnpm run build` / `pnpm run start:prod` | Build and run the compiled API |
-| `backend/` | `pnpm run test` / `test:e2e` / `test:cov` | Unit tests, e2e tests and coverage |
-| `backend/` | `pnpm run lint` / `pnpm run format` | ESLint and Prettier |
-| `frontend/` | `pnpm run dev` | Start the Next.js dev server |
-| `frontend/` | `pnpm run build` / `pnpm run start` | Production build and serve |
-| `frontend/` | `pnpm run lint` | ESLint |
+| Variable | Description | Default |
+| --- | --- | --- |
+| `BACKEND_URL` | Where Next.js forwards `/api/*` requests | `http://localhost:5000` |
 
----
+## Scripts
+
+Run from the repository root:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | API (watch mode) and web app together |
+| `pnpm dev:demo` | Same, with an in-memory database |
+| `pnpm build` | Production build of both apps |
+| `pnpm start` | Start both production builds |
+| `pnpm lint` | ESLint on both apps |
+| `pnpm typecheck` | TypeScript checks on both apps |
+| `pnpm test` | All tests |
 
 ## API Reference
 
-Base URL: `http://localhost:5000`. The interactive documentation is at **`/api`** (Swagger UI).
-No endpoint requires authentication. Data is scoped by the anonymous `sessionId`.
+All routes are under `/api`. Interactive docs: `/api/docs` (Swagger UI), raw spec: `/api/docs-json`.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check that returns `{ status, timestamp }` |
-| `GET` | `/favorite?sessionId=` | List a session's favourites, newest first |
-| `POST` | `/favorite` | Add a favourite. Returns `400` if the place is already saved |
-| `DELETE` | `/favorite/:id?sessionId=` | Remove a favourite. Returns `404` if not found |
-| `GET` | `/search-history?sessionId=&limit=` | List recent searches (`limit` defaults to 10) |
-| `POST` | `/search-history` | Record a search. Only the 20 most recent are kept per session |
-| `DELETE` | `/search-history?sessionId=` | Clear history and return `{ deletedCount }` |
+| Method | Route | Description |
+| --- | --- | --- |
+| GET | `/health` | API and database status |
+| GET | `/favorites` | Your saved places |
+| POST | `/favorites` | Save a place `{ name, address?, lat, lng }` (max 50, no duplicates) |
+| DELETE | `/favorites/:id` | Remove one of your saved places |
+| GET | `/search-history?limit=10` | Your recent searches (1–20) |
+| POST | `/search-history` | Record a search `{ query, placeName?, lat, lng }` |
+| DELETE | `/search-history` | Clear your history |
+| GET | `/places?q=bardo` | Search places in Tunisia (2–100 characters) |
+| GET | `/routes?fromLat&fromLng&toLat&toLng&arriveAt?` | Plan a car trip and get the departure time |
+| GET | `/traffic/status` | Whether live traffic is available |
+| GET | `/traffic/tiles/:layer/:z/:x/:y` | Live traffic tile (`flow` or `incidents`) |
 
-**Example: create a favourite**
+Coordinates must be inside Tunisia. Errors use the standard NestJS format: `{ statusCode, message, error }`.
 
-```json
-POST /favorite
-{
-  "name": "Tunis-Carthage Airport",
-  "address": "Tunis Carthage International Airport, Tunisia",
-  "lat": 36.851,
-  "lng": 10.2272,
-  "sessionId": "a1b2c3d4-uuid-session"
-}
-```
+## Security
 
-`POST /search-history` uses the same shape, with `query` (required) and `placeName` (optional) instead of `name` and `address`.
-
----
+- **Private data per browser:** favorites and history are tied to an `httpOnly` cookie set by the server. Clients cannot read, choose or forge another session.
+- **Strict input validation:** every body, query and URL parameter is validated and unknown fields are rejected. Coordinates are limited to Tunisia, text lengths are capped, ids are checked.
+- **No secrets in the browser:** the TomTom key stays on the server; tiles and routes are proxied.
+- **Rate limiting** per client IP, with tighter limits on search and routing, plus caching to respect the free tiers of external services.
+- **Security headers:** Helmet on the API; Content Security Policy, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy` on the web app.
+- **No HTML injection:** map popups render place names as text, never as HTML.
+- **0 known vulnerabilities** in dependencies (`pnpm audit`), kept up to date by Dependabot.
 
 ## Testing and Quality
 
 ```bash
-# Backend unit tests (Jest)
-cd backend
-pnpm run test
-
-# Frontend type check + production build
-cd frontend
-pnpm run build
+pnpm test        # 44 API tests + 35 web tests
+pnpm lint
+pnpm typecheck
 ```
 
-The backend has spec files for `AppController`, `FavoriteService` and `SearchHistoryService`, plus an e2e test setup. They are mostly the generated starter tests, so coverage is minimal. The frontend has no automated tests.
-
----
+- **API:** Vitest and Supertest against the real NestJS app and an in-memory MongoDB. External services are mocked. Covers session isolation, validation, duplicates and limits, history ordering, caching, upstream failures, TomTom and OSRM routing, and tile rules.
+- **Web:** Vitest, Testing Library and axe-core. Covers the API client, time and traffic logic, search keyboard flow, saving places, trip planning and accessibility of every panel.
+- **CI:** GitHub Actions runs lint, type checks, tests, both builds and a native ES module check of the API build on every push and pull request.
 
 ## Design Decisions and Limitations
 
-| Decision | Trade-off |
-|---|---|
-| **Anonymous sessions** instead of accounts | No sign-up is needed, but data is tied to one browser and is lost if `localStorage` is cleared |
-| **TomTom free tier** | Fine for demos, but rate-limited. The API key is a `NEXT_PUBLIC_` variable and is visible in the browser |
-| **Time-based traffic status panel** | Uses peak-hour rules, not live data. It is a general guide, not accurate per road |
-| **Route destinations** | The departure helper only routes to the 8 built-in popular places, not to any searched place |
-| **Single page** | Simple architecture, but there are no separate routes or SEO pages |
-
----
-
-## Roadmap
-
-- Replace anonymous sessions with real user accounts so favourites work across devices.
-- Calculate the traffic status panel from live TomTom flow or incident data.
-- Allow routing to any searched place or saved favourite.
-- Move TomTom calls behind the backend so the API key is not exposed and requests can be rate-limited.
-- Add Arabic and French translations.
-- Expand automated tests (backend services and frontend components).
-- Add deployment configuration (no hosting setup is included yet).
-
----
-
-## Contributing
-
-Contributions are welcome. Fork the repository and create a feature branch (`git checkout -b feature/my-change`). Commit your changes and open a pull request. Please run `pnpm run lint` in both apps before you submit.
-
----
+- **Rush hour status is an estimate** based on usual peak hours, not a measurement. Live congestion comes from the TomTom layer when it is enabled.
+- **OSRM fallback has no traffic data**, so without a TomTom key trip times are free-flow estimates. The app says so next to the result.
+- **No accounts on purpose:** anonymous sessions keep the app instant to use. Clearing cookies starts a new session.
+- **Public OSRM and Nominatim servers** are fine for a demo and light use. For heavier traffic, point `OSRM_URL` and `NOMINATIM_URL` to your own instances.
 
 ## License
 
-No license file is currently included; all rights reserved by the author.
+[MIT](LICENSE) © Hamdi Werhani. Map data © OpenStreetMap contributors. Traffic data © TomTom.
 
----
-
-## Author
-
-**Hamdi Werhani**: GitHub [@hamdiwerhanii](https://github.com/hamdiwerhanii)
+**Author:** Hamdi Werhani, GitHub [@hamdiwerhanii](https://github.com/hamdiwerhanii)

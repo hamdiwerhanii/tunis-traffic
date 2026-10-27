@@ -1,24 +1,46 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { FavoriteModule } from './favorite/favorite.module.js';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { SessionMiddleware } from './common/session/session.middleware.js';
+import { AppConfigModule } from './config/app-config.module.js';
+import { AppConfigService } from './config/app-config.service.js';
+import { FavoritesModule } from './favorites/favorites.module.js';
+import { HealthController } from './health/health.controller.js';
+import { PlacesModule } from './places/places.module.js';
+import { RoutesModule } from './routes/routes.module.js';
 import { SearchHistoryModule } from './search-history/search-history.module.js';
+import { TrafficModule } from './traffic/traffic.module.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      envFilePath: [`.env.${process.env.NODE_ENV}`, '.env'],
-      isGlobal: true,
+    AppConfigModule,
+    MongooseModule.forRootAsync({
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => ({
+        uri: config.mongoUri,
+        autoIndex: true,
+        serverSelectionTimeoutMS: 5000,
+      }),
     }),
-    MongooseModule.forRoot(process.env.MONGODB_URI!, {
-      autoIndex: true,
+    ThrottlerModule.forRootAsync({
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => ({
+        throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
+        skipIf: () => config.isTest,
+      }),
     }),
-    FavoriteModule,
+    FavoritesModule,
     SearchHistoryModule,
+    PlacesModule,
+    RoutesModule,
+    TrafficModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(SessionMiddleware).forRoutes('{*splat}');
+  }
+}

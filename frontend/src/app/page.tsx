@@ -1,5 +1,5 @@
-import TrafficDashboard from "@/modules/traffic/components/TrafficDashboard";
+import TrafficDashboard from "@/modules/Traffic/components/TrafficDashboard";
 
-export default function Home() {
+export default function HomePage() {
   return <TrafficDashboard />;
 }

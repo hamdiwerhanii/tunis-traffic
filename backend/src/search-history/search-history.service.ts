@@ -1,77 +1,73 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { SearchHistory } from './schema/search-history.schema.js';
-import { CreateSearchHistoryDto } from './dto/create-search-history.dto.js';
+import type { Model } from 'mongoose';
+import { isDuplicateKeyError } from '../common/database/mongo-errors.js';
+import { roundCoordinate } from '../common/geo/tunisia.js';
+import { MAX_HISTORY } from './dto/list-history.query.dto.js';
+import { RecordSearchDto } from './dto/record-search.dto.js';
+import { SearchEntryResponseDto, toSearchEntryResponse } from './dto/search-entry-response.dto.js';
+import { SearchEntry } from './search-entry.schema.js';
+
+const HISTORY_PRECISION = 5;
 
 @Injectable()
 export class SearchHistoryService {
-    constructor(
-        @InjectModel(SearchHistory.name)
-        private searchHistoryModel: Model<SearchHistory>,
-    ) { }
+  constructor(@InjectModel(SearchEntry.name) private readonly entries: Model<SearchEntry>) {}
 
-    private readonly logger = new Logger(SearchHistoryService.name);
+  async list(sessionId: string, limit: number): Promise<SearchEntryResponseDto[]> {
+    const entries = await this.entries
+      .find({ sessionId })
+      .sort({ searchedAt: -1 })
+      .limit(limit)
+      .lean();
+    return entries.map(toSearchEntryResponse);
+  }
 
-    async create(
-        createSearchHistoryDto: CreateSearchHistoryDto,
-    ): Promise<SearchHistory> {
-        try {
-            const entry = new this.searchHistoryModel(createSearchHistoryDto);
-            const saved = await entry.save();
+  async record(sessionId: string, dto: RecordSearchDto): Promise<SearchEntryResponseDto> {
+    const filter = {
+      sessionId,
+      lat: roundCoordinate(dto.lat, HISTORY_PRECISION),
+      lng: roundCoordinate(dto.lng, HISTORY_PRECISION),
+    };
+    const update = {
+      $set: { query: dto.query, placeName: dto.placeName || undefined, searchedAt: new Date() },
+    };
 
-            // Keep only last 20 entries per session (auto-cleanup)
-            const count = await this.searchHistoryModel
-                .countDocuments({ sessionId: createSearchHistoryDto.sessionId })
-                .exec();
+    const entry = await this.upsert(filter, update);
+    await this.trim(sessionId);
+    return toSearchEntryResponse(entry);
+  }
 
-            if (count > 20) {
-                const oldest = await this.searchHistoryModel
-                    .find({ sessionId: createSearchHistoryDto.sessionId })
-                    .sort({ createdAt: 1 })
-                    .limit(count - 20)
-                    .select('_id')
-                    .exec();
+  async clear(sessionId: string): Promise<void> {
+    await this.entries.deleteMany({ sessionId });
+  }
 
-                await this.searchHistoryModel
-                    .deleteMany({ _id: { $in: oldest.map((o) => o._id) } })
-                    .exec();
-            }
-
-            return saved;
-        } catch (error) {
-            this.logger.error(`Failed to create search history: ${error}`);
-            throw error;
-        }
+  private async upsert(
+    filter: Pick<SearchEntry, 'sessionId' | 'lat' | 'lng'>,
+    update: object,
+    retry = true,
+  ): Promise<SearchEntry & { _id: unknown }> {
+    try {
+      return await this.entries
+        .findOneAndUpdate(filter, update, { upsert: true, returnDocument: 'after' })
+        .lean()
+        .orFail();
+    } catch (error) {
+      if (retry && isDuplicateKeyError(error)) return this.upsert(filter, update, false);
+      throw error;
     }
+  }
 
-    async findBySession(
-        sessionId: string,
-        limit: number = 10,
-    ): Promise<SearchHistory[]> {
-        try {
-            return this.searchHistoryModel
-                .find({ sessionId })
-                .sort({ createdAt: -1 })
-                .limit(limit)
-                .lean()
-                .exec();
-        } catch (error) {
-            this.logger.error(`Failed to find search history: ${error}`);
-            throw error;
-        }
+  private async trim(sessionId: string): Promise<void> {
+    const overflow = await this.entries
+      .find({ sessionId })
+      .sort({ searchedAt: -1 })
+      .skip(MAX_HISTORY)
+      .select('_id')
+      .lean();
+
+    if (overflow.length > 0) {
+      await this.entries.deleteMany({ _id: { $in: overflow.map((entry) => entry._id) } });
     }
-
-    async clearBySession(sessionId: string): Promise<{ deletedCount: number }> {
-        try {
-            const result = await this.searchHistoryModel
-                .deleteMany({ sessionId })
-                .exec();
-
-            return { deletedCount: result.deletedCount };
-        } catch (error) {
-            this.logger.error(`Failed to clear search history: ${error}`);
-            throw error;
-        }
-    }
+  }
 }

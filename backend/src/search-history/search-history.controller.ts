@@ -1,80 +1,48 @@
+import { Body, Controller, Delete, Get, HttpCode, Post, Query } from '@nestjs/common';
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Body,
-  Query,
-  ParseIntPipe,
-  DefaultValuePipe,
-} from '@nestjs/common';
-import { SearchHistoryService } from './search-history.service.js';
-import {
-  ApiBody,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOperation,
-  ApiResponse,
   ApiTags,
-  ApiQuery,
 } from '@nestjs/swagger';
-import { CreateSearchHistoryDto } from './dto/create-search-history.dto.js';
-import { SearchHistory } from './schema/search-history.schema.js';
+import { SessionId } from '../common/session/session-id.decorator.js';
+import { SESSION_COOKIE } from '../common/session/session.middleware.js';
+import { ListHistoryQueryDto } from './dto/list-history.query.dto.js';
+import { RecordSearchDto } from './dto/record-search.dto.js';
+import { SearchEntryResponseDto } from './dto/search-entry-response.dto.js';
+import { SearchHistoryService } from './search-history.service.js';
 
 @ApiTags('search-history')
+@ApiCookieAuth(SESSION_COOKIE)
 @Controller('search-history')
 export class SearchHistoryController {
-  constructor(
-    private readonly searchHistoryService: SearchHistoryService,
-  ) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Record a search in history' })
-  @ApiBody({ type: CreateSearchHistoryDto })
-  @ApiResponse({ status: 201, description: 'Search recorded successfully' })
-  async create(
-    @Body() createSearchHistoryDto: CreateSearchHistoryDto,
-  ): Promise<SearchHistory> {
-    return this.searchHistoryService.create(createSearchHistoryDto);
-  }
+  constructor(private readonly searchHistoryService: SearchHistoryService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get search history for a session' })
-  @ApiQuery({
-    name: 'sessionId',
-    required: true,
-    description: 'Anonymous session ID',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Max number of entries to return (default: 10)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Search history retrieved successfully',
-  })
-  async findBySession(
-    @Query('sessionId') sessionId: string,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe)
-    limit: number = 10,
-  ): Promise<SearchHistory[]> {
-    return this.searchHistoryService.findBySession(sessionId, limit);
+  @ApiOperation({ summary: 'List the recent searches of the current browser session' })
+  list(
+    @SessionId() sessionId: string,
+    @Query() query: ListHistoryQueryDto,
+  ): Promise<SearchEntryResponseDto[]> {
+    return this.searchHistoryService.list(sessionId, query.limit);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Record a searched place (repeated places move to the top)' })
+  @ApiCreatedResponse({ type: SearchEntryResponseDto })
+  record(
+    @SessionId() sessionId: string,
+    @Body() dto: RecordSearchDto,
+  ): Promise<SearchEntryResponseDto> {
+    return this.searchHistoryService.record(sessionId, dto);
   }
 
   @Delete()
-  @ApiOperation({ summary: 'Clear all search history for a session' })
-  @ApiQuery({
-    name: 'sessionId',
-    required: true,
-    description: 'Anonymous session ID',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Search history cleared successfully',
-  })
-  async clearBySession(
-    @Query('sessionId') sessionId: string,
-  ): Promise<{ deletedCount: number }> {
-    return this.searchHistoryService.clearBySession(sessionId);
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Clear the search history of the current browser session' })
+  @ApiNoContentResponse({ description: 'History cleared' })
+  clear(@SessionId() sessionId: string): Promise<void> {
+    return this.searchHistoryService.clear(sessionId);
   }
 }

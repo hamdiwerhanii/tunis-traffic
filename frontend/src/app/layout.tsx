@@ -1,43 +1,40 @@
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import type { ReactNode } from "react";
 
-import Providers from "@/lib/providers";
+import Providers from "@/shared/providers/Providers";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Tunis Traffic Quick Check — Real-Time Traffic in Tunis",
+  title: "Tunis Traffic | Live traffic and when to leave",
   description:
-    "Check real-time traffic conditions in Tunis, Tunisia. View live traffic layers, peak hour alerts, and calculate your best departure time.",
-  keywords: [
-    "Tunis traffic",
-    "Tunisia traffic",
-    "real-time traffic",
-    "traffic map",
-    "Tunis roads",
-  ],
+    "Check traffic in Tunis before you drive: live traffic map, rush hours, place search, saved places and a planner that tells you when to leave.",
+  keywords: ["Tunis traffic", "Tunisia traffic", "traffic map", "rush hour Tunis", "route planner"],
   openGraph: {
-    title: "Tunis Traffic Quick Check",
-    description:
-      "Real-time traffic conditions in Tunis. See live traffic, peak hours, and plan your commute.",
+    title: "Tunis Traffic",
+    description: "Live traffic in Tunis and a planner that tells you when to leave.",
     type: "website",
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>): React.JSX.Element {
+export const viewport: Viewport = {
+  themeColor: "#0a0e1a",
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={`${inter.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>

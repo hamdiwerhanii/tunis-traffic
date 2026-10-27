@@ -1,0 +1,30 @@
+{
+  "name": "tunis-traffic",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Real-time traffic map for Tunis with search, favorite places and a traffic-aware departure planner. Next.js frontend and NestJS + MongoDB API.",
+  "author": "Hamdi Werhani (https://github.com/hamdiwerhanii)",
+  "license": "MIT",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"pnpm --filter backend start:dev\" \"pnpm --filter frontend dev\"",
+    "dev:demo": "concurrently -n api,web -c blue,magenta \"pnpm --filter backend start:demo\" \"pnpm --filter frontend dev\"",
+    "build": "pnpm -r build",
+    "start": "concurrently -n api,web -c blue,magenta \"pnpm --filter backend start:prod\" \"pnpm --filter frontend start\"",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "preferGlobalPath": "1",
+      "disablePostinstall": "1"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+packages:
+  - backend
+  - frontend
+
+overrides:
+  "@angular-devkit/schematics>ora": 5.4.1
+  multer: ^2.5.0
+
+peerDependencyRules:
+  allowedVersions:
+    eslint: "10"
+
+onlyBuiltDependencies:
+  - "@nestjs/core"
+  - "@swc/core"
+  - esbuild
+  - mongodb-memory-server
+  - sharp
+  - unrs-resolver

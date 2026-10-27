@@ -41,7 +41,7 @@
     "@swc/core": "^1.16.20",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
-    "@types/node": "^20.19.0",
+    "@types/node": "^26.6.5",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",

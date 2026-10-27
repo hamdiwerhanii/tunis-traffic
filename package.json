@@ -19,7 +19,7 @@
     "test": "pnpm -r test"
   },
   "devDependencies": {
-    "concurrently": "^9.2.5"
+    "concurrently": "^10.0.6"
   },
   "config": {
     "mongodbMemoryServer": {
